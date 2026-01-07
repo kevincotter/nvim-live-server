@@ -34,6 +34,13 @@ A simple HTTP server with live reload for HTML, CSS, JS files written in **just 
 require('live-server').setup(opts)
 ```
 
+## Usage:
+
+You can either start the server with `LiveServerStart` or `LiveServerToggle`,
+for stopping is either `LiveServerStop` or `LiveServerToggle`.
+
+You can also click the icon on status bar to toggle the server.
+
 ## Integration with status line
 
 ### NvChad

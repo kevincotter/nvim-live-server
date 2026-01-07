@@ -23,7 +23,7 @@ A simple HTTP server with live reload for HTML, CSS, JS files written in **just 
   cmd = { "LiveServerStart", "LiveServerStop", "LiveServerToggle"},
   lazy = false,
   opts = {
-    port = 5550,
+    port = 5550, -- optional, default 8080
   },
 },
 ```

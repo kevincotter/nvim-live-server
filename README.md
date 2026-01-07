@@ -5,6 +5,11 @@ A simple HTTP server with live reload for HTML, CSS, JS files written in **just 
 > [!WARNING]  
 > This plugin is experimental! It works for simple use-cases but might break with more complex ones!
 
+
+
+https://github.com/user-attachments/assets/8dba8842-a7a8-4374-a7ee-f15e1893e3f5
+
+
 ## Features:
 
 - Extremely light (Less than 400 lines of code!)

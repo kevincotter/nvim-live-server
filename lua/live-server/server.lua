@@ -78,7 +78,7 @@ local function handle_request(client, raw)
     return
   end
 
-  if path == "/" then
+  if path:sub(-1) == "/" then
     path = "/index.html"
   end
 

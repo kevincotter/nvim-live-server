@@ -106,10 +106,7 @@ local function handle_request(client, raw)
   local mime = get_mime_type(path)
 
   if mime == "text/html" and inject_fn then
-    body = inject_fn(body, path)
-    if not body then
-      return
-    end
+    inject_fn(body, path)
   end
 
   send(client, "200 OK", {

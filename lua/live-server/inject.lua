@@ -18,7 +18,7 @@ local snippet = [[
 ]]
 
 function M.inject(html, path)
-  if string.find(html, "</body>") then
+  if not string.find(html, "</body>") then
     vim.notify("Live reload is not supported without a body tag", vim.log.levels.WARN)
     return false
   end

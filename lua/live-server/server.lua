@@ -79,7 +79,7 @@ local function handle_request(client, raw)
   end
 
   if path:sub(-1) == "/" then
-    path = "/index.html"
+    path = path .. "index.html"
   end
 
   local file_path = root_dir .. path

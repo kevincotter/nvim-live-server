@@ -1,3 +1,4 @@
+local uv = vim.uv or uv
 local M = {}
 
 local server
@@ -48,9 +49,7 @@ local function send(client, status, headers, body)
   client:write(table.concat(lines, "\r\n"))
 end
 
--- -----------------------------
--- HANDLE REQUEST
--- -----------------------------
+
 local function handle_request(client, raw)
   local method, path = raw:match("(%w+)%s+([^%s]+)")
   if method ~= "GET" then
@@ -71,6 +70,7 @@ local function handle_request(client, raw)
       "Content-Type: text/event-stream",
       "Cache-Control: no-cache",
       "Connection: keep-alive",
+      "Access-Control-Allow-Origin: * ",
       "",
     }, "\r\n"))
 
@@ -113,13 +113,13 @@ local function handle_request(client, raw)
     ["Content-Type"] = mime,
     ["Content-Length"] = #body,
     ["Cache-Control"] = "no-cache",
+    ["Access-Control-Allow-Origin"] = "*",
   }, body)
 
   client:close()
 end
 
 local function is_port_busy(port)
-  local uv = vim.uv or vim.loop
   local client = uv.new_tcp()
   if not client then
     return false, "Failed to create TCP client"
@@ -163,8 +163,10 @@ end
 -- -----------------------------
 -- PUBLIC API
 -- -----------------------------
-function M.start(root, port, inject)
-  local start = vim.loop.hrtime()
+function M.start(root, inject, config)
+  local start = uv.hrtime()
+  local host = config.host
+  local port = config.port
   if M.running then
     vim.notify("Live server already running!", vim.log.levels.WARN)
     return
@@ -179,12 +181,12 @@ function M.start(root, port, inject)
     return
   end
 
-  server = vim.loop.new_tcp()
+  server = uv.new_tcp()
   if not server then
     vim.notify("tcp error", vim.log.levels.error)
     return
   end
-  local ok, err = pcall(server.bind, server, "0.0.0.0", free_port)
+  local ok, err = pcall(server.bind, server, host, free_port)
   if not ok then
     vim.notify("Failed to bind server: " .. tostring(err), vim.log.levels.ERROR)
     return
@@ -192,7 +194,7 @@ function M.start(root, port, inject)
 
   server:listen(128, function(err)
     assert(not err)
-    local client = vim.loop.new_tcp()
+    local client = uv.new_tcp()
     if not client then
       vim.notify("tcp error", vim.log.levels.error)
       return
@@ -215,8 +217,8 @@ function M.start(root, port, inject)
 
   M.running = true
   M.port = free_port
-  local elapsed_ms = (vim.loop.hrtime() - start) / 1e6
-  vim.notify("Server started in " .. string.format("%.3f ms", elapsed_ms) .. " at http://0.0.0.0:" .. free_port)
+  local elapsed_ms = (uv.hrtime() - start) / 1e6
+  vim.notify("Server started in " .. string.format("%.3f ms", elapsed_ms) .. " at http://" .. host .. ":" .. free_port)
 end
 
 function M.stop()

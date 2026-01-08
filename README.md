@@ -12,7 +12,7 @@ https://github.com/user-attachments/assets/8dba8842-a7a8-4374-a7ee-f15e1893e3f5
 
 ## Features:
 
-- Extremely light (Less than 400 lines of code!)
+- Extremely light (Less than 500 lines of code!)
 - No dependencies (Aside NVIM ofc)
 - Blazingly fast 🚀 (Starts and serves in less than milisecond!)
 - Start or Stop server by a single click from status bar.
@@ -28,6 +28,7 @@ https://github.com/user-attachments/assets/8dba8842-a7a8-4374-a7ee-f15e1893e3f5
   cmd = { "LiveServerStart", "LiveServerStop", "LiveServerToggle"},
   lazy = false,
   opts = {
+    host = "127.0.0.1" -- optional, default 0.0.0.0
     port = 5550, -- optional, default 8080
   },
 },
@@ -98,7 +99,7 @@ This server makes use of
 [SSE](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events)
 instead of relying on websockets. So theres no need for implementing
 whole websockets spec. SEE events are way less sophisticated than webstockets but are way more than enough for live reload server. \
-HTTP server was implemented using `vim.loop.new_tcp()`. It's a very simple implementation of HTTP and it should be used only for development.
+HTTP server was implemented using `vim.uv.new_tcp()`. It's a very simple implementation of HTTP and it should be used only for development.
 
 ## Why?
 

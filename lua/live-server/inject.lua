@@ -22,9 +22,7 @@ function M.inject(html, path)
     vim.notify("Live reload is not supported without a body tag", vim.log.levels.WARN)
     return false
   end
-  if path:match("%.html$") then
-    return html:gsub("</body>", snippet .. "\n</body>")
-  end
+  if path:match("%.html$") then return html:gsub("</body>", snippet .. "\n</body>") end
   return html
 end
 

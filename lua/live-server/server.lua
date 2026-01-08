@@ -34,9 +34,7 @@ local function get_mime_type(path)
   return mime_types[ext] or "application/octet-stream"
 end
 
-local function html_response(text)
-  return "<!DOCTYPE html><html><body>" .. text .. "</body></html>"
-end
+local function html_response(text) return "<!DOCTYPE html><html><body>" .. text .. "</body></html>" end
 
 local function send(client, status, headers, body)
   local lines = { "HTTP/1.1 " .. status }
@@ -78,9 +76,7 @@ local function handle_request(client, raw)
     return
   end
 
-  if path:sub(-1) == "/" then
-    path = path .. "index.html"
-  end
+  if path:sub(-1) == "/" then path = path .. "index.html" end
 
   local file_path = root_dir .. path
   local file = io.open(file_path, "rb")
@@ -105,9 +101,7 @@ local function handle_request(client, raw)
 
   local mime = get_mime_type(path)
 
-  if mime == "text/html" and inject_fn then
-    body = inject_fn(body, path)
-  end
+  if mime == "text/html" and inject_fn then body = inject_fn(body, path) end
 
   send(client, "200 OK", {
     ["Content-Type"] = mime,
@@ -121,17 +115,13 @@ end
 
 local function is_port_busy(port)
   local client = uv.new_tcp()
-  if not client then
-    return false, "Failed to create TCP client"
-  end
+  if not client then return false, "Failed to create TCP client" end
 
   local busy = false
   local done = false
 
   client:connect("127.0.0.1", port, function(err)
-    if not err then
-      busy = true
-    end
+    if not err then busy = true end
     done = true
     client:close()
   end)
@@ -150,9 +140,7 @@ local function find_free_port(start)
 
   for _ = 1, max_tries do
     local ok = not is_port_busy(port)
-    if ok then
-      return port
-    end
+    if ok then return port end
     vim.notify("Port " .. tostring(port) .. " is busy, trying another", vim.log.levels.WARN)
     port = port + 1
   end
@@ -234,13 +222,9 @@ end
 function M.reload()
   for i = #M.sse_clients, 1, -1 do
     local client = M.sse_clients[i]
-    local ok = pcall(function()
-      client:write("data: reload\n\n")
-    end)
+    local ok = pcall(function() client:write("data: reload\n\n") end)
 
-    if not ok then
-      table.remove(M.sse_clients, i)
-    end
+    if not ok then table.remove(M.sse_clients, i) end
   end
 end
 

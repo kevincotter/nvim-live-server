@@ -4,8 +4,8 @@ local server = require("live-server.server")
 
 function M.live_server_provider(opts)
   opts = opts or {}
-  local text
-  local action
+  local text ---@type string
+  local action ---@type string
   if server.running then
     text = "󰙧 Port: " .. tostring(server.port)
     action = "%@v:lua.require'live-server'.stop@"

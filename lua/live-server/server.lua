@@ -1,10 +1,40 @@
 local uv = vim.uv or vim.loop
 local M = {}
 
-local server
-local root_dir
-local inject_fn
+local server ---@type uv.uv_tcp_t?
+local root_dir ---@type string
 
+local inject_snippet = [[
+<!--  Code injected by nvim-live-server -->
+<script>
+(() => {
+  const es = new EventSource("/__live_reload");
+
+  // When the page is about to reload or navigate
+  window.addEventListener("beforeunload", () => {
+    es.close(); // explicitly close SSE
+  });
+
+  // Reload when SSE message arrives
+  es.onmessage = () => location.reload();
+})();
+</script>
+]]
+
+---@param html string
+---@param path string
+---@return string?
+local function inject(html, path)
+  if not html:find("</body>") then
+    vim.notify("Live reload is not supported without a body tag", vim.log.levels.WARN)
+    return
+  end
+
+  if path:match("%.html$") then return (html:gsub("</body>", inject_snippet .. "\n</body>")) end
+  return html
+end
+
+---@type uv.uv_tcp_t[]
 M.sse_clients = {}
 
 -- https://mimetype.io/all-types
@@ -29,17 +59,25 @@ local mime_types = {
   js = "application/javascript",
 }
 
+---@param path string
+---@return string
 local function get_mime_type(path)
   local ext = path:match("%.([^./]+)$")
   return mime_types[ext] or "application/octet-stream"
 end
 
-local function html_response(text) return "<!DOCTYPE html><html><body>" .. text .. "</body></html>" end
+---@param text string
+---@return string
+local function html_response(text) return ("<!DOCTYPE html><html><body>%s</body></html>"):format(text) end
 
+---@param client uv.uv_tcp_t
+---@param status string
+---@param headers {[string]: string}
+---@param body string?
 local function send(client, status, headers, body)
-  local lines = { "HTTP/1.1 " .. status }
+  local lines = { ("HTTP/1.1 %s"):format(status) }
   for k, v in pairs(headers) do
-    table.insert(lines, k .. ": " .. v)
+    table.insert(lines, ("%s: %s"):format(k, v))
   end
   table.insert(lines, "")
   table.insert(lines, body or "")
@@ -47,8 +85,10 @@ local function send(client, status, headers, body)
   client:write(table.concat(lines, "\r\n"))
 end
 
-
+---@param client uv.uv_tcp_t
+---@param raw string
 local function handle_request(client, raw)
+  ---@type string?, string?
   local method, path = raw:match("(%w+)%s+([^%s]+)")
   if method ~= "GET" then
     send(client, "405 Method Not Allowed", {
@@ -89,7 +129,7 @@ local function handle_request(client, raw)
     return
   end
 
-  local body = file:read("*a")
+  local body = file:read("*a") ---@type string?
   file:close()
   if not body then
     send(client, "404 Not Found", {
@@ -101,11 +141,11 @@ local function handle_request(client, raw)
 
   local mime = get_mime_type(path)
 
-  if mime == "text/html" and inject_fn then body = inject_fn(body, path) end
+  if mime == "text/html" then body = inject(body, path) end
 
   send(client, "200 OK", {
     ["Content-Type"] = mime,
-    ["Content-Length"] = #body,
+    ["Content-Length"] = tostring(#body),
     ["Cache-Control"] = "no-cache",
     ["Access-Control-Allow-Origin"] = "*",
   }, body)
@@ -113,45 +153,12 @@ local function handle_request(client, raw)
   client:close()
 end
 
-local function is_port_busy(port)
-  local client = uv.new_tcp()
-  if not client then return false, "Failed to create TCP client" end
-
-  local busy = false
-  local done = false
-
-  client:connect("127.0.0.1", port, function(err)
-    if not err then busy = true end
-    done = true
-    client:close()
-  end)
-
-  -- Process events until done (typically instant for local checks)
-  while not done do
-    uv.run("once")
-  end
-
-  return busy
-end
-
-local function find_free_port(start)
-  local port = start
-  local max_tries = 20
-
-  for _ = 1, max_tries do
-    local ok = not is_port_busy(port)
-    if ok then return port end
-    vim.notify("Port " .. tostring(port) .. " is busy, trying another", vim.log.levels.WARN)
-    port = port + 1
-  end
-
-  return nil
-end
-
 -- -----------------------------
 -- PUBLIC API
 -- -----------------------------
-function M.start(root, inject, config)
+---@param root string
+---@param config live_server.Opts
+function M.start(root, config)
   local start = uv.hrtime()
   local host = config.host
   local port = config.port
@@ -160,38 +167,40 @@ function M.start(root, inject, config)
     return
   end
 
-  inject_fn = inject
   root_dir = root
-
-  local free_port = find_free_port(port)
-  if not free_port then
-    vim.notify("No free port found", vim.log.levels.ERROR)
-    return
-  end
 
   server = uv.new_tcp()
   if not server then
-    vim.notify("tcp error", vim.log.levels.error)
-    return
-  end
-  local ok, err = pcall(server.bind, server, host, free_port)
-  if not ok then
-    vim.notify("Failed to bind server: " .. tostring(err), vim.log.levels.ERROR)
+    vim.notify("tcp error", vim.log.levels.ERROR)
     return
   end
 
-  server:listen(128, function(err)
-    assert(not err)
+  local ok, err, err_name = server.bind(server, host, port)
+  if not ok and err_name == "EADDRINUSE" then
+    ok, err, err_name = server.bind(server, host, 0)
+  end
+  if not ok then
+    vim.notify(("Failed to bind server: %s"):format(err), vim.log.levels.ERROR)
+    return
+  end
+
+  ---@param err3 string?
+  local on_connection = function(err3)
+    assert(not err3, err3)
+
     local client = uv.new_tcp()
     if not client then
-      vim.notify("tcp error", vim.log.levels.error)
+      vim.notify("tcp error", vim.log.levels.ERROR)
       return
     end
+
     server:accept(client)
-    client:read_start(function(_, data)
+    client:read_start(function(err4, data)
+      assert(not err4, err4)
+
       if not data then
-        for i = #M.sse_clients, 1, -1 do
-          if M.sse_clients[i] == client then
+        for i, c in ipairs(M.sse_clients) do
+          if c == client then
             table.remove(M.sse_clients, i)
             break
           end
@@ -201,12 +210,28 @@ function M.start(root, inject, config)
       end
       handle_request(client, data)
     end)
-  end)
+  end
+
+  local ok2, err2, err_name2 = server:listen(128, on_connection)
+  if not ok2 and err_name2 == "EADDRINUSE" then
+    ok, err, err_name = server.bind(server, host, 0)
+    if not ok then
+      vim.notify(("Failed to bind server: %s"):format(err), vim.log.levels.ERROR)
+      return
+    end
+
+    ok2, err2, err_name2 = server:listen(128, on_connection)
+  end
+  if not ok2 then
+    vim.notify(("Failed to listen on server: %s"):format(err2), vim.log.levels.ERROR)
+    return
+  end
 
   M.running = true
-  M.port = free_port
+  M.port = server:getsockname().port
+  M.host = server:getsockname().ip
   local elapsed_ms = (uv.hrtime() - start) / 1e6
-  vim.notify("Server started in " .. string.format("%.3f ms", elapsed_ms) .. " at http://" .. host .. ":" .. free_port)
+  vim.notify(("Server started in %.3f ms at http://%s:%d"):format(elapsed_ms, M.host, M.port))
 end
 
 function M.stop()
@@ -220,11 +245,10 @@ function M.stop()
 end
 
 function M.reload()
-  for i = #M.sse_clients, 1, -1 do
-    local client = M.sse_clients[i]
-    local ok = pcall(function() client:write("data: reload\n\n") end)
+  for i, client in ipairs(M.sse_clients) do
+    local _, err = client:write("data: reload\n\n")
 
-    if not ok then table.remove(M.sse_clients, i) end
+    if err then table.remove(M.sse_clients, i) end
   end
 end
 

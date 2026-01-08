@@ -12,7 +12,7 @@ M.opts = {
 
 function M.setup(opts)
   M.opts = vim.tbl_deep_extend("force", M.opts, opts or {})
-  
+
   user_commands.register()
 end
 
@@ -22,9 +22,7 @@ function M.start()
   local port = M.opts.port
 
   server.start(root, inject.inject, M.opts)
-  watcher.watch(root, function()
-    server.reload()
-  end)
+  watcher.watch(root, function() server.reload() end)
   vim.cmd("redrawstatus")
 end
 

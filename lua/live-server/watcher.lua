@@ -22,16 +22,18 @@ local function simple_watch(dir, on_change, recursive)
 end
 
 local function linux_watch(root_dir, on_change)
-  local handle = simple_watch(root_dir, on_change)
+  simple_watch(root_dir, on_change)
+
   local scanner = uv.fs_scandir(root_dir)
-  if scanner then
-    while true do
-      local name, type = uv.fs_scandir_next(scanner)
-      if not name then break end
-      if type == 'directory' then
-        local sub = root_dir .. '/' .. name
-        simple_watch(sub, on_change)
-      end
+  if not scanner then return end
+
+  while true do
+    local name, type = uv.fs_scandir_next(scanner)
+    if not name then break end
+
+    if type == 'directory' then
+      local sub = root_dir .. '/' .. name
+      linux_watch(sub, on_change) -- recurse
     end
   end
 end

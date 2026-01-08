@@ -1,4 +1,4 @@
-local uv = vim.uv or uv
+local uv = vim.uv or vim.loop
 local M = {}
 
 local server

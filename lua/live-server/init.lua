@@ -1,7 +1,5 @@
 local server = require("live-server.server")
 local watcher = require("live-server.watcher")
-local inject = require("live-server.inject")
-local user_commands = require("live-server.user_commands")
 
 local M = {}
 
@@ -10,18 +8,17 @@ M.opts = {
   port = 8080,
 }
 
-function M.setup(opts)
-  M.opts = vim.tbl_deep_extend("force", M.opts, opts or {})
+---@class live_server.Opts
+---@field port integer
+---@field host string
 
-  user_commands.register()
-end
+---@param opts live_server.Opts
+function M.setup(opts) M.opts = vim.tbl_deep_extend("force", M.opts, opts) end
 
 function M.start()
   local root = vim.fn.getcwd()
-  local host = M.opts.host
-  local port = M.opts.port
 
-  server.start(root, inject.inject, M.opts)
+  server.start(root, M.opts)
   watcher.watch(root, function() server.reload() end)
   vim.cmd("redrawstatus")
 end

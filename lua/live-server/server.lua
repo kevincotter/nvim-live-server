@@ -162,6 +162,7 @@ function M.start(root, config)
   local start = uv.hrtime()
   local host = config.host
   local port = config.port
+  local max_attempts = config.bind_attempts
   if M.running then
     vim.notify("Live server already running!", vim.log.levels.WARN)
     return
@@ -171,32 +172,23 @@ function M.start(root, config)
 
   server = uv.new_tcp()
   if not server then
-    vim.notify("tcp error", vim.log.levels.ERROR)
+    vim.notify("Live server encounter TCP error!", vim.log.levels.ERROR)
     return
   end
 
-  local ok, err, err_name = server.bind(server, host, port)
-  if not ok and err_name == "EADDRINUSE" then
-    ok, err, err_name = server.bind(server, host, 0)
-  end
-  if not ok then
-    vim.notify(("Failed to bind server: %s"):format(err), vim.log.levels.ERROR)
-    return
-  end
-
-  ---@param err3 string?
-  local on_connection = function(err3)
-    assert(not err3, err3)
+  ---@param conn_err string?
+  local on_connection = function(conn_err)
+    assert(not conn_err, conn_err)
 
     local client = uv.new_tcp()
     if not client then
-      vim.notify("tcp error", vim.log.levels.ERROR)
+      vim.notify("Live server encounter TCP error", vim.log.levels.ERROR)
       return
     end
 
     server:accept(client)
-    client:read_start(function(err4, data)
-      assert(not err4, err4)
+    client:read_start(function(r_err, data)
+      assert(not r_err, r_err)
 
       if not data then
         for i, c in ipairs(M.sse_clients) do
@@ -212,20 +204,31 @@ function M.start(root, config)
     end)
   end
 
-  local ok2, err2, err_name2 = server:listen(128, on_connection)
-  if not ok2 and err_name2 == "EADDRINUSE" then
-    ok, err, err_name = server.bind(server, host, 0)
-    if not ok then
-      vim.notify(("Failed to bind server: %s"):format(err), vim.log.levels.ERROR)
-      return
+  ---@param port_curr integer
+  ---@return string?
+  local function bind_server(port_curr)
+    local b_ok, b_err, b_err_name = server.bind(server, host, port_curr)
+    if not b_ok then
+      if port_curr == 0 or b_err_name == "EADDRINUSE" then
+        vim.notify(("Live server failed to bind server: %s"):format(b_err), vim.log.levels.ERROR)
+        return b_err
+      end
+      local new_port = (port_curr + 2 <= port + max_attempts) and (port_curr + 1) or 0
+      return bind_server(new_port)
     end
+    local l_ok, l_err, l_err_name = server:listen(128, on_connection)
+    if not l_ok then
+      if port_curr == 0 or l_err_name ~= "EADDRINUSE" then
+        vim.notify(("Failed to listen on server: %s"):format(l_err), vim.log.levels.ERROR)
+        return b_err
+      end
+      local new_port = (port_curr + 2 <= port + max_attempts) and (port_curr + 1) or 0
+      return bind_server(new_port)
+    end
+  end
 
-    ok2, err2, err_name2 = server:listen(128, on_connection)
-  end
-  if not ok2 then
-    vim.notify(("Failed to listen on server: %s"):format(err2), vim.log.levels.ERROR)
-    return
-  end
+  local err = bind_server(port)
+  if err then return end
 
   M.running = true
   M.port = server:getsockname().port

@@ -6,11 +6,13 @@ local M = {}
 M.opts = {
   host = "0.0.0.0",
   port = 8080,
+  bind_attempts = 2,
 }
 
 ---@class live_server.Opts
 ---@field port integer
 ---@field host string
+---@field bind_attempts integer
 
 ---@param opts live_server.Opts
 function M.setup(opts) M.opts = vim.tbl_deep_extend("force", M.opts, opts) end

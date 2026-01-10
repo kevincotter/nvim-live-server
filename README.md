@@ -30,6 +30,7 @@ https://github.com/user-attachments/assets/8dba8842-a7a8-4374-a7ee-f15e1893e3f5
   opts = {
     host = "127.0.0.1" -- optional, default 0.0.0.0
     port = 5550, -- optional, default 8080
+    bind_attempts = 3, -- optional, default 2
   },
 },
 ```
@@ -100,6 +101,14 @@ This server makes use of
 instead of relying on websockets. So theres no need for implementing
 whole websockets spec. SEE events are way less sophisticated than webstockets but are way more than enough for live reload server. \
 HTTP server was implemented using `vim.uv.new_tcp()`. It's a very simple implementation of HTTP and it should be used only for development.
+
+
+## Automatic free port detection
+
+Server will automatically try different ports if default port specified in config is currently busy.
+By default it will try default port + current attempt no. With last attempt (max attempts specified in config with `bind_attempts`) it
+will ask system to pick a random free port. If that also fails server will give up.
+If you want to skip predictable port checking and ask system right away to give you a random free port just set `bind_attempts` to 1.
 
 ## Why?
 

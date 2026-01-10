@@ -234,7 +234,7 @@ function M.start(root, config)
   M.port = server:getsockname().port
   M.host = server:getsockname().ip
   local elapsed_ms = (uv.hrtime() - start) / 1e6
-  vim.notify(("Server started in %.3f ms at http://%s:%d"):format(elapsed_ms, M.host, M.port))
+  vim.notify(("Server started in %.3fms at http://%s:%d"):format(elapsed_ms, M.host, M.port))
 end
 
 function M.stop()
